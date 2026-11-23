@@ -18,6 +18,8 @@ const shortCode = $('#short-code');
 const shareApi = $('meta[name="share-api"]').content;
 const configError = $('#config-error');
 const configSubmit = $('#config-submit');
+const importModes = $('#import-modes');
+const importMode = configForm.elements.mode;
 const returnArea = $('#candidate-end');
 const groupNames = { candidates: '候选区', team1: '一队', team2: '二队' };
 const storageKey = 'nsh-roster:v1:' + location.pathname.replace(/index\.html$/, '');
@@ -36,6 +38,7 @@ let roster = restore();
 let editingId = null;
 let configMode = 'import';
 let configSession = 0;
+let importModePicked = false;
 let toastTimer;
 
 function announce(message) {
@@ -283,19 +286,31 @@ function showConfigError(message) {
   configError.hidden = false;
 }
 
+function updateImportAction() {
+  if (!importModePicked) {
+    importMode.value = parseShortCode(configCode.value) ? 'replace' : 'merge';
+  }
+  if (importMode.value === 'replace') {
+    configSubmit.textContent = roster.players.length ? '覆盖并恢复排表' : '恢复完整排表';
+  } else {
+    configSubmit.textContent = '仅加入玩家';
+  }
+}
+
 async function openConfig(mode) {
   configMode = mode;
   const session = ++configSession;
   const importing = mode === 'import';
   const sharing = mode === 'share';
   configForm.reset();
+  importModes.disabled = false;
+  importModePicked = false;
   configError.hidden = true;
   if (importing) {
     $('#config-title').textContent = '导入配置';
     $('#config-note').textContent = shareApi
-      ? '粘贴 12 位短码或完整配置码，再选择导入方式。'
+      ? '粘贴 12 位短码或完整配置码。短码默认恢复两队的位置。'
       : '粘贴别人分享的配置码，再选择导入方式。';
-    configSubmit.textContent = '导入配置';
   } else if (sharing) {
     $('#config-title').textContent = '分享排表';
     $('#config-note').textContent = '生成短码会上传当前排表。拿到短码的人可在 ' + SHARE_DAYS + ' 天内导入。';
@@ -306,7 +321,7 @@ async function openConfig(mode) {
     configSubmit.textContent = '复制配置码';
   }
   configSubmit.disabled = mode === 'export';
-  $('#import-modes').hidden = !importing;
+  importModes.hidden = !importing;
   $('#config-code-field').hidden = sharing;
   $('#short-code-field').hidden = !sharing;
   $('#config-switch').hidden = importing || !shareApi;
@@ -314,6 +329,7 @@ async function openConfig(mode) {
   configCode.disabled = sharing;
   configCode.readOnly = !importing;
   configCode.value = '';
+  if (importing) updateImportAction();
   if (!configDialog.open) configDialog.showModal();
   if (sharing) configSubmit.focus();
   if (mode !== 'export') return;
@@ -332,7 +348,18 @@ async function openConfig(mode) {
 $('#import-button').addEventListener('click', () => openConfig('import'));
 $('#export-button').addEventListener('click', () => openConfig(shareApi ? 'share' : 'export'));
 $('#config-switch').addEventListener('click', () => openConfig(configMode === 'share' ? 'export' : 'share'));
-configCode.addEventListener('input', () => { configError.hidden = true; });
+configCode.addEventListener('input', () => {
+  configError.hidden = true;
+  if (configMode === 'import') updateImportAction();
+});
+function markImportModePicked() {
+  importModePicked = true;
+  updateImportAction();
+}
+importModes.addEventListener('change', markImportModePicked);
+importModes.addEventListener('click', (event) => {
+  if (event.target.name === 'mode') markImportModePicked();
+});
 
 async function copyCode(field, session, message) {
   try {
@@ -382,6 +409,8 @@ configForm.addEventListener('submit', async (event) => {
   }
 
   let incoming;
+  const selectedMode = importMode.value;
+  importModes.disabled = true;
   configCode.readOnly = true;
   try {
     const code = parseShortCode(configCode.value);
@@ -389,6 +418,7 @@ configForm.addEventListener('submit', async (event) => {
   } catch (error) {
     if (!isCurrentConfig(session)) return;
     configSubmit.disabled = false;
+    importModes.disabled = false;
     configCode.readOnly = false;
     showConfigError(error.message);
     configCode.focus();
@@ -396,7 +426,7 @@ configForm.addEventListener('submit', async (event) => {
   }
   if (!isCurrentConfig(session)) return;
   let message;
-  if (new FormData(configForm).get('mode') === 'replace') {
+  if (selectedMode === 'replace') {
     roster = incoming;
     message = '已恢复完整排表。';
   } else {
