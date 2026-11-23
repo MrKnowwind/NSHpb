@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="逆水寒十二人排表，拖动人员卡片编队，支持本地保存和配置码分享。">
+  <meta name="theme-color" content="#101316">
+  <title>十二人排表 · 逆水寒</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span>逆水寒<span class="brand-detail">团队工具</span></span>
+      </div>
+      <div class="top-actions">
+        <span class="storage" id="storage"><i aria-hidden="true"></i><span>本地保存</span></span>
+        <button type="button" class="button secondary" id="import-button"><span class="icon transfer import-icon" aria-hidden="true"></span>导入<span class="action-detail">配置</span></button>
+        <button type="button" class="button secondary" id="export-button"><span class="icon transfer" aria-hidden="true"></span>导出<span class="action-detail">配置</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell workspace">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero-art" aria-hidden="true"></div>
+      <div class="hero-content">
+        <div class="hero-meta"><span class="hero-tick" aria-hidden="true"></span>团本编队</div>
+        <h1 id="page-title">十二人排表</h1>
+        <p>拖动玩家卡片，把候选名单排进两个队伍。</p>
+      </div>
+      <div class="hero-stats" aria-label="排表统计">
+        <div class="stat">
+          <span class="stat-value" id="registered-count">0</span>
+          <span class="stat-label">已登记玩家</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value accent"><span id="assigned-count">0</span><small> / 12</small></span>
+          <span class="stat-label">已编队</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="legend" aria-labelledby="legend-title">
+      <h2 id="legend-title">职业配色</h2>
+      <ul id="job-legend"></ul>
+    </section>
+
+    <div class="board" id="board">
+      <section class="panel candidates" aria-labelledby="candidate-title">
+        <header class="panel-header">
+          <div>
+            <div class="panel-heading"><h2 id="candidate-title">候选区</h2><span class="count" id="candidate-count">0</span></div>
+            <p>待分配的玩家</p>
+          </div>
+          <button type="button" class="button primary" id="add-player"><span class="icon plus" aria-hidden="true"></span>添加玩家</button>
+        </header>
+        <div class="candidate-grid" id="candidate-grid"></div>
+        <div class="return-area" id="candidate-end" data-group="candidates">
+          <span class="icon inbox" aria-hidden="true"></span><span id="candidate-drop-label">拖到这里，移回候选区</span>
+        </div>
+        <div class="demo-bar" id="demo-bar" hidden>
+          <span><i class="demo-mark" aria-hidden="true"></i>当前为示例阵容</span>
+          <button type="button" class="text-button" id="clear-demo">清空示例</button>
+        </div>
+      </section>
+
+      <section class="panel teams" aria-labelledby="teams-title">
+        <header class="panel-header">
+          <div>
+            <div class="panel-heading"><h2 id="teams-title">队伍列表</h2></div>
+            <p>有空位时插入并靠顶，满队时交换</p>
+          </div>
+        </header>
+        <div class="team-stack" id="team-stack"></div>
+      </section>
+    </div>
+    <p class="board-help"><span class="icon info" aria-hidden="true"></span>点击玩家卡片也可以编辑资料或移动位置。</p>
+  </main>
+
+  <dialog id="player-dialog" aria-labelledby="player-title">
+    <form id="player-form">
+      <div class="dialog-header">
+        <h2 id="player-title">添加玩家</h2>
+        <button type="button" class="close-button" data-close aria-label="关闭"><span class="icon cross" aria-hidden="true"></span></button>
+      </div>
+      <p id="demo-add-note" class="dialog-note" hidden>添加第一位玩家时会清空示例阵容。</p>
+      <label class="field">玩家名<input id="player-name" placeholder="输入游戏内名字" name="name" required autofocus></label>
+      <label class="field">主职业<select id="main-job" name="main" required></select></label>
+      <fieldset class="alternates">
+        <legend>副职业 <span>选填，可多选</span></legend>
+        <div class="job-options" id="alt-jobs"></div>
+      </fieldset>
+      <label class="field" id="position-field" hidden>移动位置<select id="player-position"></select></label>
+      <div class="delete-confirm" id="delete-confirm" hidden>
+        <span>确定从名单移除这名玩家？</span>
+        <button type="button" class="text-button danger" id="confirm-delete">确认移除</button>
+        <button type="button" class="text-button" id="cancel-delete">取消</button>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="text-button danger" id="delete-player" hidden>移除玩家</button>
+        <button type="button" class="button secondary" data-close>取消</button>
+        <button type="submit" class="button primary" id="save-player">添加到候选区</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="config-dialog" aria-labelledby="config-title">
+    <form id="config-form">
+      <div class="dialog-header">
+        <h2 id="config-title"></h2>
+        <button type="button" class="close-button" data-close aria-label="关闭"><span class="icon cross" aria-hidden="true"></span></button>
+      </div>
+      <p id="config-note" class="dialog-note"></p>
+      <label class="field">配置码
+        <textarea id="config-code" rows="5" spellcheck="false" autocomplete="off" placeholder="粘贴以 PB1. 开头的配置码" aria-describedby="config-note config-error" required autofocus></textarea>
+      </label>
+      <fieldset class="import-modes" id="import-modes">
+        <legend>导入方式</legend>
+        <label class="mode-option"><input type="radio" name="mode" value="merge" checked><span><strong>仅加入玩家</strong><small>新玩家放入候选区，保留现有资料和位置</small></span></label>
+        <label class="mode-option"><input type="radio" name="mode" value="replace"><span><strong>恢复完整排表</strong><small>用配置码里的玩家和位置覆盖当前排表</small></span></label>
+      </fieldset>
+      <p class="form-error" id="config-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="button secondary" data-close>关闭</button>
+        <button type="submit" class="button primary" id="config-submit"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
