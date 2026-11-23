@@ -1,0 +1,22 @@
+name = "nshpb-shares"
+main = "worker/index.mjs"
+compatibility_date = "2026-06-19"
+workers_dev = true
+preview_urls = false
+
+[vars]
+SITE_ORIGIN = "https://mrknowwind.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nshpb-shares"
+database_id = "de8a0092-5cf8-46e6-ba48-0aab61f3820e"
+migrations_dir = "worker/migrations"
+
+[[ratelimits]]
+name = "SHARE_LIMITER"
+namespace_id = "612049"
+simple = { limit = 20, period = 60 }
+
+[triggers]
+crons = ["17 3 * * *"]

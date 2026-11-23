@@ -4,10 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="逆水寒十二人排表，拖动人员卡片编队，支持本地保存和配置码分享。">
+  <meta name="share-api" content="https://nshpb-shares.mrknowwind-nshpb.workers.dev">
   <meta name="theme-color" content="#101316">
   <title>十二人排表 · 逆水寒</title>
-  <link rel="stylesheet" href="./styles.css?v=2">
-  <script type="module" src="./app.mjs?v=2"></script>
+  <link rel="stylesheet" href="./styles.css?v=3">
+  <script type="module" src="./app.mjs?v=3"></script>
 </head>
 <body>
   <header class="topbar">
@@ -113,8 +114,11 @@
         <button type="button" class="close-button" data-close aria-label="关闭"><span class="icon cross" aria-hidden="true"></span></button>
       </div>
       <p id="config-note" class="dialog-note"></p>
-      <label class="field">配置码
+      <label class="field" id="config-code-field">配置码
         <textarea id="config-code" rows="5" spellcheck="false" autocomplete="off" placeholder="粘贴配置码" aria-describedby="config-note config-error" required autofocus></textarea>
+      </label>
+      <label class="field" id="short-code-field" hidden>分享短码
+        <input id="short-code" type="text" readonly spellcheck="false" autocomplete="off" placeholder="点击下方生成 12 位短码">
       </label>
       <fieldset class="import-modes" id="import-modes">
         <legend>导入方式</legend>
@@ -123,6 +127,7 @@
       </fieldset>
       <p class="form-error" id="config-error" role="alert" hidden></p>
       <div class="dialog-actions">
+        <button type="button" class="text-button config-switch" id="config-switch" hidden>完整配置码</button>
         <button type="button" class="button secondary" data-close>关闭</button>
         <button type="submit" class="button primary" id="config-submit"></button>
       </div>

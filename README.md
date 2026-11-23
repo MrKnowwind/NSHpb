@@ -8,7 +8,7 @@
 
 名单和排表自动保存在当前浏览器。首次打开时，候选区和两支队伍都是空白的。
 
-「导出配置」可复制包含玩家和队伍顺序的压缩配置码。「导入配置」兼容旧版配置码，可将新玩家加入候选区，也可恢复完整排表。仅加入玩家时，重复导入同一份配置会跳过已存在的玩家。
+「导出配置」可生成一行 12 位短码，也可复制完整配置码。点击「生成短码」会将当前排表上传到 Cloudflare，收到短码的人可在 30 天内导入。「导入配置」也接受旧版配置码，可将新玩家加入候选区或恢复完整排表。仅加入玩家时，重复导入同一份配置会跳过已存在的玩家。
 
 ## 本地运行
 
@@ -21,7 +21,7 @@ python -m http.server 8000 --directory site
 使用 Node.js 24 运行测试。
 
 ```sh
-node --test tests/roster.test.mjs
+node --test
 ```
 
 ## GitHub Pages 部署
@@ -30,4 +30,15 @@ node --test tests/roster.test.mjs
 2. 在仓库的 **Settings → Pages → Build and deployment** 中将 **Source** 设为 **GitHub Actions**。
 3. 如果第一次推送时还没启用 Pages，在 **Actions → Deploy roster to GitHub Pages** 中选择 **Run workflow**。后续推送到 `main` 会自动测试并部署。
 
-部署完成后，在工作流的 `github-pages` 环境中可找到站点地址。部署只发布 `site/` 下的网页文件，玩家数据保存在各自的浏览器中。
+部署完成后，在工作流的 `github-pages` 环境中可找到站点地址。部署只发布 `site/` 下的网页文件。
+
+## 短码服务部署
+
+短码接口由 Cloudflare Worker 和 D1 提供。使用有该账户权限的 Wrangler 登录，在项目目录应用数据库迁移后部署 Worker。
+
+```sh
+npx wrangler d1 migrations apply DB --remote
+npx wrangler deploy
+```
+
+Worker 的入口地址由 `site/index.html` 中的 `share-api` 配置。若更换站点域名，更新 `wrangler.toml` 中的 `SITE_ORIGIN`。

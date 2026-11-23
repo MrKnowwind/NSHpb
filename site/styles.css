@@ -273,6 +273,8 @@ legend span { margin-left: 4px; font-size: 13px; color: var(--muted); font-weigh
 .mode-option strong { display: block; font-size: 14px; }
 .mode-option small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
 .dialog-actions { display: flex; gap: 7px; justify-content: flex-end; margin-top: 18px; }
+.config-switch { margin-right: auto; }
+#short-code { font-family: ui-monospace, monospace; }
 #delete-player { margin-right: auto; }
 .delete-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 13px; }
 .form-error { color: var(--danger); font-size: 14px; }

@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: '24'
       - name: Test roster
-        run: node --test tests/roster.test.mjs
+        run: node --test
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

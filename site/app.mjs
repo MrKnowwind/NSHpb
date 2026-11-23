@@ -2,6 +2,7 @@ import {
   JOBS, GROUPS, NAME_LENGTH, TEAM_SIZE, emptyRoster, findPlayerPosition,
   movePlayer, packTeam, validateRoster, encodeRoster, decodeRoster, mergePlayers,
 } from './roster.mjs?v=2';
+import { SHARE_DAYS, parseShortCode, createShortCode, loadShortCode } from './share.mjs?v=3';
 
 const $ = (selector) => document.querySelector(selector);
 const board = $('#board');
@@ -13,6 +14,8 @@ const nameField = $('#player-name');
 const mainJob = $('#main-job');
 const positionField = $('#player-position');
 const configCode = $('#config-code');
+const shortCode = $('#short-code');
+const shareApi = $('meta[name="share-api"]').content;
 const configError = $('#config-error');
 const configSubmit = $('#config-submit');
 const returnArea = $('#candidate-end');
@@ -284,19 +287,36 @@ async function openConfig(mode) {
   configMode = mode;
   const session = ++configSession;
   const importing = mode === 'import';
+  const sharing = mode === 'share';
   configForm.reset();
   configError.hidden = true;
-  $('#config-title').textContent = importing ? '导入配置' : '导出配置';
-  $('#config-note').textContent = importing
-    ? '粘贴别人分享的配置码，再选择导入方式。'
-    : '复制配置码可分享玩家资料与两队位置。';
-  configSubmit.textContent = importing ? '导入配置' : '复制配置码';
-  configSubmit.disabled = !importing;
+  if (importing) {
+    $('#config-title').textContent = '导入配置';
+    $('#config-note').textContent = shareApi
+      ? '粘贴 12 位短码或完整配置码，再选择导入方式。'
+      : '粘贴别人分享的配置码，再选择导入方式。';
+    configSubmit.textContent = '导入配置';
+  } else if (sharing) {
+    $('#config-title').textContent = '分享排表';
+    $('#config-note').textContent = '生成短码会上传当前排表。拿到短码的人可在 ' + SHARE_DAYS + ' 天内导入。';
+    configSubmit.textContent = '生成短码';
+  } else {
+    $('#config-title').textContent = '导出完整配置';
+    $('#config-note').textContent = '复制完整配置码可分享玩家资料与两队位置。';
+    configSubmit.textContent = '复制配置码';
+  }
+  configSubmit.disabled = mode === 'export';
   $('#import-modes').hidden = !importing;
+  $('#config-code-field').hidden = sharing;
+  $('#short-code-field').hidden = !sharing;
+  $('#config-switch').hidden = importing || !shareApi;
+  $('#config-switch').textContent = sharing ? '完整配置码' : '分享短码';
+  configCode.disabled = sharing;
   configCode.readOnly = !importing;
   configCode.value = '';
-  configDialog.showModal();
-  if (importing) return;
+  if (!configDialog.open) configDialog.showModal();
+  if (sharing) configSubmit.focus();
+  if (mode !== 'export') return;
 
   try {
     const code = await encodeRoster(roster);
@@ -310,33 +330,62 @@ async function openConfig(mode) {
 }
 
 $('#import-button').addEventListener('click', () => openConfig('import'));
-$('#export-button').addEventListener('click', () => openConfig('export'));
+$('#export-button').addEventListener('click', () => openConfig(shareApi ? 'share' : 'export'));
+$('#config-switch').addEventListener('click', () => openConfig(configMode === 'share' ? 'export' : 'share'));
 configCode.addEventListener('input', () => { configError.hidden = true; });
+
+async function copyCode(field, session, message) {
+  try {
+    await navigator.clipboard.writeText(field.value);
+    if (!isCurrentConfig(session)) return;
+    configDialog.close();
+    announce(message);
+  } catch {
+    if (!isCurrentConfig(session)) return;
+    configSubmit.disabled = false;
+    field.focus();
+    field.select();
+    showConfigError('已选中配置码，请手动复制。');
+  }
+}
+
 configForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (configSubmit.disabled) return;
   const session = configSession;
   configSubmit.disabled = true;
   if (configMode === 'export') {
-    try {
-      await navigator.clipboard.writeText(configCode.value);
-      if (!isCurrentConfig(session)) return;
-      configDialog.close();
-      announce('配置码已复制。');
-    } catch {
-      if (!isCurrentConfig(session)) return;
-      configSubmit.disabled = false;
-      configCode.focus();
-      configCode.select();
-      showConfigError('已选中配置码，请手动复制。');
+    await copyCode(configCode, session, '配置码已复制。');
+    return;
+  }
+  if (configMode === 'share') {
+    if (shortCode.value) {
+      await copyCode(shortCode, session, '短码已复制。');
+      return;
     }
+    configError.hidden = true;
+    configSubmit.textContent = '正在生成…';
+    try {
+      const code = await createShortCode(shareApi, roster);
+      if (!isCurrentConfig(session)) return;
+      shortCode.value = code;
+      shortCode.focus();
+      shortCode.select();
+      configSubmit.textContent = '复制短码';
+    } catch (error) {
+      if (!isCurrentConfig(session)) return;
+      configSubmit.textContent = '生成短码';
+      showConfigError(error.message);
+    }
+    configSubmit.disabled = false;
     return;
   }
 
   let incoming;
   configCode.readOnly = true;
   try {
-    incoming = await decodeRoster(configCode.value);
+    const code = parseShortCode(configCode.value);
+    incoming = code ? await loadShortCode(shareApi, code) : await decodeRoster(configCode.value);
   } catch (error) {
     if (!isCurrentConfig(session)) return;
     configSubmit.disabled = false;
