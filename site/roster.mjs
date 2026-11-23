@@ -88,20 +88,49 @@ export function validateRoster(data) {
   return roster;
 }
 
-export function encodeRoster(roster) {
-  const bytes = new TextEncoder().encode(JSON.stringify(roster));
-  const base64 = btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''));
-  return 'PB1.' + base64.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+function compactRoster(roster) {
+  const indices = new Map(roster.players.map(({ id }, index) => [id, index]));
+  const players = roster.players.map(({ id, name, main, alts }) => [id, name, main, ...alts]);
+  const positions = GROUPS.map((group) =>
+    roster[group].map((id) => id === null ? null : (indices.get(id) ?? -1)));
+  return [players, ...positions];
 }
 
-export function decodeRoster(input) {
+function expandRoster([rows, ...positions]) {
+  const players = rows.map(([id, name, main, ...alts]) => ({ id, name, main, alts }));
+  const roster = { players };
+  for (const [groupIndex, group] of GROUPS.entries()) {
+    roster[group] = positions[groupIndex].map((index) => {
+      if (index === null) return null;
+      return Number.isInteger(index) ? players[index]?.id : undefined;
+    });
+  }
+  return roster;
+}
+
+async function transformBytes(bytes, transform) {
+  const stream = new Blob([bytes]).stream().pipeThrough(transform);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+export async function encodeRoster(roster) {
+  const json = new TextEncoder().encode(JSON.stringify(compactRoster(roster)));
+  const bytes = await transformBytes(json, new CompressionStream('deflate'));
+  const base64 = btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''));
+  return 'PB2.' + base64.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+export async function decodeRoster(input) {
   const code = input.replace(/\s+/g, '');
-  if (!/^PB1\.[A-Za-z0-9_-]+$/.test(code)) throw new Error('请粘贴完整的 PB1 配置码。');
+  if (!/^PB[12]\.[A-Za-z0-9_-]+$/.test(code)) throw new Error('请粘贴完整的配置码。');
+  const compressed = code.startsWith('PB2.');
   let data;
   try {
     const base64 = code.slice(4).replaceAll('-', '+').replaceAll('_', '/');
-    const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
-    data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    const payload = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+    const bytes = compressed ? await transformBytes(payload, new DecompressionStream('deflate')) : payload;
+    const json = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    data = compressed ? expandRoster(json) : json;
   } catch {
     throw new Error('配置码无法读取，请重新复制后再试。');
   }

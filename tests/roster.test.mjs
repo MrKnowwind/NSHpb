@@ -61,17 +61,34 @@ test('dropping on a candidate inserts before the target and keeps the other play
   assert.equal(roster.team1[2], null);
 });
 
-test('a configuration code preserves Chinese names, alternate jobs, and exact slots', () => {
+const legacyCode = (roster) => 'PB1.' + Buffer.from(JSON.stringify(roster)).toString('base64url');
+
+test('a compressed configuration code preserves Chinese names, alternate jobs, and exact slots', async () => {
   const roster = emptyRoster();
   roster.players.push({ id: 'a', name: '照夜 · 山岚', main: '素问', alts: ['铁衣', '玄机'] });
   roster.team2[5] = 'a';
 
-  const code = model.encodeRoster(roster);
-  assert.match(code, /^PB1\.[A-Za-z0-9_-]+$/);
-  assert.deepEqual(model.decodeRoster(`  ${code}\n`), roster);
-  assert.throws(() => model.decodeRoster('invalid'));
+  const code = await model.encodeRoster(roster);
+  assert.match(code, /^PB2\.[A-Za-z0-9_-]+$/);
+  assert.deepEqual(await model.decodeRoster(`  ${code}\n`), roster);
+  assert.deepEqual(await model.decodeRoster(legacyCode(roster)), roster);
+  await assert.rejects(model.decodeRoster('invalid'));
+  await assert.rejects(model.decodeRoster('PB2.invalid'));
   roster.candidates.push('a');
-  assert.throws(() => model.decodeRoster(model.encodeRoster(roster)));
+  await assert.rejects(model.decodeRoster(legacyCode(roster)));
+  await assert.rejects(model.decodeRoster(await model.encodeRoster(roster)));
+});
+
+test('a full roster exports in less than half the length of its old code', async () => {
+  const roster = emptyRoster();
+  for (let index = 0; index < 12; index++) {
+    const player = { id: crypto.randomUUID(), name: '照夜 · 山岚' + index, main: '碎梦', alts: ['龙吟', '玄机'] };
+    roster.players.push(player);
+    roster[index < 6 ? 'team1' : 'team2'][index % 6] = player.id;
+  }
+  assert.ok((await model.encodeRoster(roster)).length < legacyCode(roster).length / 2);
+  assert.deepEqual(await model.decodeRoster(await model.encodeRoster(roster)), roster);
+  assert.deepEqual(await model.decodeRoster(await model.encodeRoster(emptyRoster())), emptyRoster());
 });
 
 test('merging a shared roster adds new players to candidates and retains existing assignments', () => {

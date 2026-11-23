@@ -1,7 +1,7 @@
 import {
   JOBS, GROUPS, NAME_LENGTH, TEAM_SIZE, emptyRoster, findPlayerPosition,
   movePlayer, packTeam, validateRoster, encodeRoster, decodeRoster, mergePlayers,
-} from './roster.mjs';
+} from './roster.mjs?v=2';
 
 const $ = (selector) => document.querySelector(selector);
 const board = $('#board');
@@ -14,43 +14,25 @@ const mainJob = $('#main-job');
 const positionField = $('#player-position');
 const configCode = $('#config-code');
 const configError = $('#config-error');
+const configSubmit = $('#config-submit');
 const returnArea = $('#candidate-end');
 const groupNames = { candidates: '候选区', team1: '一队', team2: '二队' };
 const storageKey = 'nsh-roster:v1:' + location.pathname.replace(/index\.html$/, '');
 
-function demoRoster() {
-  const sample = [
-    ['江上听风', '神相', '鸿音'], ['月下归舟', '潮光'],
-    ['雾里寻春', '素问', '龙吟'], ['半盏青灯', '九灵', '碎梦'],
-    ['松间白鹤', '龙吟'], ['山色未晚', '碎梦', '沧澜'],
-    ['长街照雪', '玄机'], ['长亭晚渡', '沧澜', '血河'],
-    ['青山如旧', '铁衣'], ['鹿鸣知野', '素问', '鸿音'],
-    ['小楼听雨', '潮光'], ['星河入梦', '九灵', '神相'],
-    ['惊鸿一面', '血河', '龙吟'], ['风起南岸', '龙吟'],
-    ['疏影横斜', '鸿音', '素问'],
-  ];
-  const players = sample.map(([name, main, ...alts], index) => ({ id: 'demo-' + index, name, main, alts }));
-  const ids = players.map(({ id }) => id);
-  return {
-    players, candidates: ids.slice(0, 8),
-    team1: [...ids.slice(8, 12), null, null],
-    team2: [...ids.slice(12), null, null, null],
-  };
-}
-
 function restore() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey));
-    if (saved) return { roster: validateRoster(saved.roster), demo: saved.demo === true };
-    return { roster: demoRoster(), demo: true };
+    if (saved && saved.demo !== true) return validateRoster(saved.roster);
   } catch {
-    return { roster: demoRoster(), demo: true };
+    return emptyRoster();
   }
+  return emptyRoster();
 }
 
-let { roster, demo } = restore();
+let roster = restore();
 let editingId = null;
 let configMode = 'import';
+let configSession = 0;
 let toastTimer;
 
 function announce(message) {
@@ -64,7 +46,7 @@ function announce(message) {
 function save(message) {
   render();
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ roster, demo }));
+    localStorage.setItem(storageKey, JSON.stringify({ roster }));
     $('#storage').classList.remove('storage-error');
     $('#storage span').textContent = '本地保存';
   } catch {
@@ -118,7 +100,6 @@ function render() {
   $('#registered-count').textContent = players.size;
   $('#candidate-count').textContent = roster.candidates.length;
   $('#assigned-count').textContent = roster.team1.filter(Boolean).length + roster.team2.filter(Boolean).length;
-  $('#demo-bar').hidden = !demo;
   $('#candidate-drop-label').textContent = roster.candidates.length
     ? '拖到这里，放在候选末尾'
     : '暂无候选玩家，可添加玩家或拖回卡片';
@@ -198,7 +179,6 @@ function openPlayer(id = null) {
   nameField.setCustomValidity('');
   $('#player-title').textContent = player ? '编辑玩家' : '添加玩家';
   $('#save-player').textContent = player ? '保存修改' : '添加到候选区';
-  $('#demo-add-note').hidden = Boolean(player) || !demo;
   $('#delete-player').hidden = !player;
   $('#delete-confirm').hidden = true;
   $('#position-field').hidden = !player;
@@ -240,12 +220,6 @@ function focusPlayer(id) {
 nameField.addEventListener('input', () => nameField.setCustomValidity(''));
 mainJob.addEventListener('change', refreshAlternates);
 $('#add-player').addEventListener('click', () => openPlayer());
-$('#clear-demo').addEventListener('click', () => {
-  demo = false;
-  roster = emptyRoster();
-  save('已清空示例，可以添加自己的玩家。');
-  $('#add-player').focus();
-});
 
 playerForm.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -265,10 +239,6 @@ playerForm.addEventListener('submit', (event) => {
       movePlayer(roster, player.id, group, Number(index));
     }
   } else {
-    if (demo) {
-      roster = emptyRoster();
-      demo = false;
-    }
     player = { id: crypto.randomUUID(), ...details };
     roster.players.push(player);
     roster.candidates.push(player.id);
@@ -301,20 +271,42 @@ $('#confirm-delete').addEventListener('click', () => {
   $('#add-player').focus({ preventScroll: true });
 });
 
-function openConfig(mode) {
+function isCurrentConfig(session) {
+  return configDialog.open && session === configSession;
+}
+
+function showConfigError(message) {
+  configError.textContent = message;
+  configError.hidden = false;
+}
+
+async function openConfig(mode) {
   configMode = mode;
+  const session = ++configSession;
   const importing = mode === 'import';
   configForm.reset();
   configError.hidden = true;
   $('#config-title').textContent = importing ? '导入配置' : '导出配置';
-  const importNote = demo ? '粘贴别人分享的配置码。导入后会清空当前示例。' : '粘贴别人分享的配置码，再选择导入方式。';
-  $('#config-note').textContent = importing ? importNote : '复制配置码可分享玩家资料与两队位置。';
-  $('#config-submit').textContent = importing ? '导入配置' : '复制配置码';
+  $('#config-note').textContent = importing
+    ? '粘贴别人分享的配置码，再选择导入方式。'
+    : '复制配置码可分享玩家资料与两队位置。';
+  configSubmit.textContent = importing ? '导入配置' : '复制配置码';
+  configSubmit.disabled = !importing;
   $('#import-modes').hidden = !importing;
   configCode.readOnly = !importing;
-  configCode.value = importing ? '' : encodeRoster(roster);
+  configCode.value = '';
   configDialog.showModal();
-  if (!importing) configCode.select();
+  if (importing) return;
+
+  try {
+    const code = await encodeRoster(roster);
+    if (!isCurrentConfig(session)) return;
+    configCode.value = code;
+    configCode.select();
+    configSubmit.disabled = false;
+  } catch {
+    if (isCurrentConfig(session)) showConfigError('无法生成配置码，请使用新版浏览器后重试。');
+  }
 }
 
 $('#import-button').addEventListener('click', () => openConfig('import'));
@@ -322,39 +314,46 @@ $('#export-button').addEventListener('click', () => openConfig('export'));
 configCode.addEventListener('input', () => { configError.hidden = true; });
 configForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (configSubmit.disabled) return;
+  const session = configSession;
+  configSubmit.disabled = true;
   if (configMode === 'export') {
     try {
       await navigator.clipboard.writeText(configCode.value);
+      if (!isCurrentConfig(session)) return;
       configDialog.close();
       announce('配置码已复制。');
     } catch {
+      if (!isCurrentConfig(session)) return;
+      configSubmit.disabled = false;
       configCode.focus();
       configCode.select();
-      configError.textContent = '已选中配置码，请手动复制。';
-      configError.hidden = false;
+      showConfigError('已选中配置码，请手动复制。');
     }
     return;
   }
 
   let incoming;
+  configCode.readOnly = true;
   try {
-    incoming = decodeRoster(configCode.value);
+    incoming = await decodeRoster(configCode.value);
   } catch (error) {
-    configError.textContent = error.message;
-    configError.hidden = false;
+    if (!isCurrentConfig(session)) return;
+    configSubmit.disabled = false;
+    configCode.readOnly = false;
+    showConfigError(error.message);
     configCode.focus();
     return;
   }
+  if (!isCurrentConfig(session)) return;
   let message;
   if (new FormData(configForm).get('mode') === 'replace') {
     roster = incoming;
     message = '已恢复完整排表。';
   } else {
-    if (demo) roster = emptyRoster();
     const added = mergePlayers(roster, incoming);
     message = added ? '已加入 ' + added + ' 名玩家。' : '配置中没有新玩家。';
   }
-  demo = false;
   configDialog.close();
   save(message);
 });

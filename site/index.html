@@ -6,8 +6,8 @@
   <meta name="description" content="逆水寒十二人排表，拖动人员卡片编队，支持本地保存和配置码分享。">
   <meta name="theme-color" content="#101316">
   <title>十二人排表 · 逆水寒</title>
-  <link rel="stylesheet" href="./styles.css">
-  <script type="module" src="./app.mjs"></script>
+  <link rel="stylesheet" href="./styles.css?v=2">
+  <script type="module" src="./app.mjs?v=2"></script>
 </head>
 <body>
   <header class="topbar">
@@ -62,10 +62,6 @@
         <div class="return-area" id="candidate-end" data-group="candidates">
           <span class="icon inbox" aria-hidden="true"></span><span id="candidate-drop-label">拖到这里，移回候选区</span>
         </div>
-        <div class="demo-bar" id="demo-bar" hidden>
-          <span><i class="demo-mark" aria-hidden="true"></i>当前为示例阵容</span>
-          <button type="button" class="text-button" id="clear-demo">清空示例</button>
-        </div>
       </section>
 
       <section class="panel teams" aria-labelledby="teams-title">
@@ -78,7 +74,10 @@
         <div class="team-stack" id="team-stack"></div>
       </section>
     </div>
-    <p class="board-help"><span class="icon info" aria-hidden="true"></span>点击玩家卡片也可以编辑资料或移动位置。</p>
+    <footer class="board-footer">
+      <p class="board-help"><span class="icon info" aria-hidden="true"></span>点击玩家卡片也可以编辑资料或移动位置。</p>
+      <p class="easter-egg">19再也不怕数错人的妙妙小工具 :D</p>
+    </footer>
   </main>
 
   <dialog id="player-dialog" aria-labelledby="player-title">
@@ -87,7 +86,6 @@
         <h2 id="player-title">添加玩家</h2>
         <button type="button" class="close-button" data-close aria-label="关闭"><span class="icon cross" aria-hidden="true"></span></button>
       </div>
-      <p id="demo-add-note" class="dialog-note" hidden>添加第一位玩家时会清空示例阵容。</p>
       <label class="field">玩家名<input id="player-name" placeholder="输入游戏内名字" name="name" required autofocus></label>
       <label class="field">主职业<select id="main-job" name="main" required></select></label>
       <fieldset class="alternates">
@@ -116,7 +114,7 @@
       </div>
       <p id="config-note" class="dialog-note"></p>
       <label class="field">配置码
-        <textarea id="config-code" rows="5" spellcheck="false" autocomplete="off" placeholder="粘贴以 PB1. 开头的配置码" aria-describedby="config-note config-error" required autofocus></textarea>
+        <textarea id="config-code" rows="5" spellcheck="false" autocomplete="off" placeholder="粘贴配置码" aria-describedby="config-note config-error" required autofocus></textarea>
       </label>
       <fieldset class="import-modes" id="import-modes">
         <legend>导入方式</legend>
